@@ -49,6 +49,7 @@ For running you just have to browse with your terminal into the folder where you
 |    --host   | string |    no   |     localhost    |                   --host 127.1.4.3                  |
 |    --port   | int |    no   |    8086     |                   --port 4000                  |
 |    --norm   | int |    no   |     1    |                   --norm 100                  |
+|    --timestamp   | int |    no   |     0    |                   --timestamp 1481031795001                  |
 
 **token:** the account token you can find in your account page in relayr
 dashboard;
@@ -63,7 +64,9 @@ dashboard;
 
 **port:** the port of your local InfluxDB instance;
 
-**norm:** if the readings on the cloud need to be normalized, this is the factor to divide the readings.
+**norm:** if the readings on the cloud need to be normalized, this is the factor to divide the readings;
+
+**timestamp:** the timestamp in UNIX format expressed in milliseconds from when download the readings. If it is not expressed, the script downloads the readings from the timestamp of the last downloaded reading +1ms, while if it is the first iteration the default value if current timestamp - 3 days.
 
 #### Notes
 

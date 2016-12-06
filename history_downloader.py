@@ -4,7 +4,7 @@ Relayr To InfluxDB Inflater v1.0.0
 This script is a bridge between the relayr cloud and a local instance of InfluxDB.
 It downloads the data of a certain device and store them in local.
 
-Last Edit: 06 Dec 2016 11.40
+Last Edit: 07 Dec 2016 00.10
 
 Copyright Riccardo Marconcini (riccardo DOT marconcini AT relayr DOT de)
 """
@@ -30,6 +30,7 @@ DEVICE_ID = ""
 DB_NAME = ""
 FREQ_CHECKING = 0
 HOST = ""
+STARTING_TIMESTAMP = 0
 PORT = 0
 NORM = 0
 
@@ -47,12 +48,15 @@ def main():
 
     while True:
 
-        #   Control of the last timestamp
+        #   Control of the last timestamp, add the parsed args
         try:
             last_timestamp = get_last_timestamp()
         except:
-            print("Last timestamp not found. Setting as default three days ago...")
-            last_timestamp = (current_milli_time() - 259200000)
+            if STARTING_TIMESTAMP != 0:
+                last_timestamp = STARTING_TIMESTAMP
+            else:
+                print("Last timestamp not found. Setting as default three days ago...")
+                last_timestamp = (current_milli_time() - 259200000)
         print("Last Timestamp: ", last_timestamp)
 
         #   Loop that checks if History API are correctly running and then it gets the readings of a device from a
@@ -167,6 +171,7 @@ def parse_args():
     parser.add_argument('--token', type=str, required=True, default="", help="Token in relayr dashboard")
     parser.add_argument('--device', type=str, required=True, default=0, help="Device")
     parser.add_argument('--norm', type=int, required=False, default=1, help="Normalization value to divide the reading")
+    parser.add_argument('--timestamp', type=int, required=False, default=0, help="Starting Timestamp")
     return parser.parse_args()
 
 
@@ -183,4 +188,5 @@ if __name__ == '__main__':
     HOST = args.host
     PORT = args.port
     NORM = args.norm
+    STARTING_TIMESTAMP = args.timestamp
     main()
