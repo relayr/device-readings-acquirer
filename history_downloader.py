@@ -1,12 +1,17 @@
 """
-Relayr To InfluxDB Inflater v1.0.0
+Relayr To InfluxDB Inflater v2.0.0
 
 This script is a bridge between the relayr cloud and a local instance of InfluxDB.
 It downloads the data of a certain device and store them in local.
 
-Last Edit: 07 Dec 2016 00.10
+Last Edit: 09 Dec 2016 01.15
 
 Copyright Riccardo Marconcini (riccardo DOT marconcini AT relayr DOT de)
+
+#todo: remove timestamp if given as param after first iteration
+#todo: fix ISO and UNIX conversion with nanoseconds
+#todo: update readme
+#todo: add comments on code
 """
 
 
@@ -17,6 +22,9 @@ Copyright Riccardo Marconcini (riccardo DOT marconcini AT relayr DOT de)
 import argparse
 import time
 import shelve
+import requests
+from datetime import datetime
+import calendar
 from relayr.api import Api
 from influxdb import InfluxDBClient
 
@@ -48,29 +56,20 @@ def main():
 
     while True:
 
+        data = []
+        count = 0
+        API_2 = True
+
         #   Control of the last timestamp, add the parsed args
         try:
-            last_timestamp = get_last_timestamp()
-        except:
             if STARTING_TIMESTAMP != 0:
                 last_timestamp = STARTING_TIMESTAMP
             else:
-                print("Last timestamp not found. Setting as default three days ago...")
-                last_timestamp = (current_milli_time() - 259200000)
+                last_timestamp = get_last_timestamp()
+        except:
+            print("Last timestamp not found. Setting as default three days ago...")
+            last_timestamp = (current_milli_time() - 259200000)
         print("Last Timestamp: ", last_timestamp)
-
-        #   Loop that checks if History API are correctly running and then it gets the readings of a device from a
-        #   certain timestamp
-        while True:
-            try:
-                time.sleep(5)
-                api = Api(TOKEN)
-                print("Start downloading data")
-                history = api.get_history_devices(DEVICE_ID, last_timestamp, None, None, None, None, None, None)
-                break
-            except:
-                history = []
-                print("API error... retry.")
 
         #   Loop for checking if InfluxDB is running, exit from the loop when the InfluxDB Client is established
         while True:
@@ -83,33 +82,98 @@ def main():
             except:
                 print("Database not ready... retry.")
 
-        data = []
-        count = 0
-
-        #  Parsing the JSON data from relayr into a format readable for InfluxDB
-        try:
-            for i in range(len(history['results'])):
-                for k in range(len(history['results'][i]['points'])):
-                    data.append({
-                        'measurement': history['results'][i]['meaning'],
-                        'time': history['results'][i]['points'][k]['timestamp'],
-                        'fields': {'value': history['results'][i]['points'][k]['value']/NORM}
-                    })
-                    count += 1
-                    tmp_last_timestamp = history['results'][i]['points'][k]['timestamp']
-
-            #   Writing the data parsed into the database specified as parameter
+        #   Loop that checks if History API 1 are correctly running and then it gets the readings of a device from a
+        #   certain timestamp
+        api_fail = 0
+        while True:
             try:
-                influxClient.write_points(data, database=DB_NAME, time_precision="ms")
-                print("Added ", count, " new rows in database")
-                if count > 0:
-                    # increasing the timestamp of 1ms before save to avoid to insert again that reading during next
-                    # iteration
-                    set_last_timestamp(tmp_last_timestamp+1)
-                    print("New Last Timestamp: ", tmp_last_timestamp+1)
-            except Exception as e:
-                print(e)
-        except:
+                time.sleep(5)
+                api = Api(TOKEN)
+                print("Start downloading data")
+                history = api.get_history_devices(DEVICE_ID, last_timestamp, None, None, None, None, None, None)
+                break
+            except:
+                history = []
+                print("API error... retry.")
+                api_fail += 1
+                if api_fail == 10:
+                    API_2 = True
+                    break
+
+        #   I parse the json if I used API v 1
+        if not API_2:
+            try:
+                for i in range(len(history['results'])):
+                    for k in range(len(history['results'][i]['points'])):
+                        data.append({
+                            'measurement': history['results'][i]['meaning'],
+                            'time': history['results'][i]['points'][k]['timestamp'],
+                            'fields': {'value': history['results'][i]['points'][k]['value']/NORM}
+                        })
+                        count += 1
+                        tmp_last_timestamp = history['results'][i]['points'][k]['timestamp']
+            except:
+                print("Error Parsing with API v 1...")
+
+
+        #   Switch to History API 2 for the request after 10 fails of History API 1
+        if API_2:
+
+            print("Using now API v 2")
+            while True:
+                try:
+                    print("Start downloading data")
+                    #   Request the device info to retrieve the model ID
+                    device_info = requests.get('https://api.relayr.io/devices/'+DEVICE_ID,
+                         headers={"authorization": "Bearer "+TOKEN,
+                                  "cache-control": "no-cache"})
+                    device_info_json = device_info.json()
+
+                    #   Request the model ID to retrieve the meanings
+                    model_info = requests.get('https://api.relayr.io/device-models/'+device_info_json['modelId'],
+                         headers={"authorization": "Bearer "+TOKEN,
+                                  "cache-control": "no-cache"})
+                    model_info_json = model_info.json()
+                    meanings = []
+                    for i in range(len(model_info_json['firmware']['1.0.0']['transport']['cloud']['readings'])):
+                        meanings.append(model_info_json['firmware']['1.0.0']['transport']['cloud']['readings'][i]['meaning'])
+
+                    #   For every meaning the script performs a request to history API 2 and parse the readings into a
+                    #   variable data
+                    for i in range(len(meanings)):
+                        readings = requests.get('https://api.relayr.io/devices/'+DEVICE_ID+'/aggregated-readings?meaning='
+                                                +meanings[i]+'&start='+to_iso(last_timestamp)
+                                                +'&interval=10s&aggregates=avg',
+                         headers={"authorization": "Bearer "+TOKEN,
+                                  "accepted": "application/json"})
+                        readings_json = readings.json()
+
+                        for k in range(len(readings_json['data'])):
+                            data.append({
+                                'measurement':meanings[i],
+                                'time': readings_json['data'][k]['timestamp'],
+                                'fields': {'value': readings_json['data'][k]['avg']/NORM}
+                            })
+                            count += 1
+                            tmp_last_timestamp = readings_json['data'][k]['timestamp']
+                    break
+                except:
+                    print("Error with API v 2... retry.")
+                    meanings = []
+                    data = []
+
+        #   Writing the data parsed into the database specified as parameter
+        try:
+            influxClient.write_points(data, database=DB_NAME, time_precision="ms")
+            print("Added ", count, " new rows in database")
+            if count > 0:
+                # increasing the timestamp of 1ms before save to avoid to insert again that reading during next
+                # iteration
+                if API_2:
+                    tmp_last_timestamp = to_unix(tmp_last_timestamp)
+                set_last_timestamp(tmp_last_timestamp+1)
+                print("New Last Timestamp: ", to_iso(tmp_last_timestamp))
+        except Exception:
             print("Error Writing")
 
         print("Sleeping for the next ", FREQ_CHECKING, " seconds... \n")
@@ -153,6 +217,22 @@ def get_last_timestamp():
 #   Return current time in milliseconds
 def current_milli_time():
     return int(round(time.time() * 1000))
+
+
+#    Convert the UNIX time in ms into ISO format
+def to_iso(unixtime):
+    """ The function converts the UNIX time to ISO format
+    :param unixtime: UNIX time expressed in milliseconds
+    :return: the time in ISO format
+    """
+    isodate = datetime.fromtimestamp(float(unixtime/1000)).isoformat()
+    return isodate
+
+
+#    Convert the UNIX time in ms into ISO format
+def to_unix(isodate):
+    unixtime = calendar.timegm(datetime.strptime(isodate, "%Y-%m-%dT%H:%M:%S.%fZ").timetuple())
+    return unixtime
 
 
 #######################################################################################################################
