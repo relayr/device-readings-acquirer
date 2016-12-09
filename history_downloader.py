@@ -8,7 +8,6 @@ Last Edit: 09 Dec 2016 01.15
 
 Copyright Riccardo Marconcini (riccardo DOT marconcini AT relayr DOT de)
 
-#todo: remove timestamp if given as param after first iteration
 #todo: fix ISO and UNIX conversion with nanoseconds
 #todo: update readme
 #todo: add comments on code
@@ -58,7 +57,8 @@ def main():
 
         data = []
         count = 0
-        API_2 = True
+        API_2 = False
+        tmp_last_timestamp = 0
 
         #   Control of the last timestamp, add the parsed args
         try:
@@ -144,8 +144,7 @@ def main():
                         readings = requests.get('https://api.relayr.io/devices/'+DEVICE_ID+'/aggregated-readings?meaning='
                                                 +meanings[i]+'&start='+to_iso(last_timestamp)
                                                 +'&interval=10s&aggregates=avg',
-                         headers={"authorization": "Bearer "+TOKEN,
-                                  "accepted": "application/json"})
+                         headers={"authorization": "Bearer "+TOKEN, "accepted": "application/json"})
                         readings_json = readings.json()
 
                         for k in range(len(readings_json['data'])):
@@ -170,11 +169,16 @@ def main():
                 # increasing the timestamp of 1ms before save to avoid to insert again that reading during next
                 # iteration
                 if API_2:
-                    tmp_last_timestamp = to_unix(tmp_last_timestamp)
-                set_last_timestamp(tmp_last_timestamp+1)
-                print("New Last Timestamp: ", to_iso(tmp_last_timestamp))
+                    tmp_unix = to_unix(tmp_last_timestamp)
+                    set_last_timestamp(tmp_unix+1)
+                    print("New Last Timestamp: ", tmp_unix+1)
+                else:
+                    set_last_timestamp(tmp_last_timestamp+1)
+                    print("New Last Timestamp: ", tmp_last_timestamp+1)
         except Exception:
             print("Error Writing")
+
+        reset_starttime()
 
         print("Sleeping for the next ", FREQ_CHECKING, " seconds... \n")
         time.sleep(FREQ_CHECKING)
@@ -232,7 +236,15 @@ def to_iso(unixtime):
 #    Convert the UNIX time in ms into ISO format
 def to_unix(isodate):
     unixtime = calendar.timegm(datetime.strptime(isodate, "%Y-%m-%dT%H:%M:%S.%fZ").timetuple())
+    unixtime *= 1000
     return unixtime
+
+
+
+#   Reset the STARTTIME global variable to 0
+def reset_starttime():
+    global STARTING_TIMESTAMP
+    STARTING_TIMESTAMP = 0
 
 
 #######################################################################################################################
