@@ -9,34 +9,52 @@ The History Downloader is a script written in Python that downloads the readings
 -->
 For the correct use of this script, you must have:
 
-- a registered device in the relayr dashboard;
-- Python 3.X installed on your device with PIP;
-- InfluxDB installed on your device. 
+- a registered device in the [relayr dashboard](https://developer.relayr.io/);
+- [Python 3.X](https://www.python.org/downloads/) installed on your device with [PIP](https://pip.pypa.io/en/stable/installing/);
+- [InfluxDB](https://docs.influxdata.com/influxdb/v1.1/introduction/installation) installed on your device. 
 
 ## Installation & Configuration
 <!--Step-by-step instructions, with proper punctuation, on how to install and configure the project.-->
 ### 1) Install the InfluxDB Client for Python
-As written in the official [InfluxDB repository](https://github.com/influxdata/influxdb-python) you can use PIP to install
+As written in the official [InfluxDB repository](https://github.com/influxdata/influxdb-python) you can use PIP to install the InfluxDB client:
 
 	# pip install influxdb
 
-or update if you have already installed it.
+or update if you have already installed it:
 
 	# pip install --upgrade influxdb
 	
-If you use Debian/Ubuntu based distribution, you can install via the APT package manager:
+If you use a Debian/Ubuntu based distribution, you can install via the APT package manager:
 
 	$ sudo apt-get install python-influxdb
+	
+### 2) Install the Requests module for Python
+For install the [Requests](http://docs.python-requests.org/en/master/) module for Python:
 
-### 2) Install the relayr SDK for Python
-You can install with PIP the last version directly from GitHub:
+	# pip install requests
+
+or update if you have already installed it:
+
+	# pip install --upgrade requests
+
+
+### 3) Install the relayr SDK for Python
+You can install with PIP the last version directly from [GitHub](https://github.com/relayr/python-sdk):
 
 	# pip install git+https://github.com/relayr/python-sdk
 
 ### 3) Run the script
-For running you just have to browse with your terminal into the folder where you have the script and launch the command, for example:
+For running the script you have just to browse with your terminal into the folder where you have the script and launch the command, for example:
 
-	$ python3 history_downloader.py --token 1234567890 --device 0987654321 --db DBname
+	$ python3 history_downloader.py --token 1234567890 --device 0987654321 --db DBname --norm 100 --freq 3000
+	
+Output example:
+	
+	Last Timestamp:  1481533346001
+	Start downloading data
+	Added  98  new rows in database
+	New Last Timestamp:  1481539920001
+	Sleeping for the next  3000  seconds... 
 	
 #### Parameters
 	
@@ -54,11 +72,11 @@ For running you just have to browse with your terminal into the folder where you
 **token:** the account token you can find in your account page in relayr
 dashboard;
 
-**device:** the device ID;
+**device:** the device ID on relayr dashboard;
 
-**db:** the name of the database where you want to save your readings;
+**db:** the name of the local InfluxDB database where you want to save your readings;
 
-**freq:** the frequency of checking the cloud if there are new readings available;
+**freq:** the frequency of checking the cloud if there are new readings available, in seconds;
 
 **host:** the host of your local InfluxDB instance;
 
@@ -66,12 +84,12 @@ dashboard;
 
 **norm:** if the readings on the cloud need to be normalized, this is the factor to divide the readings;
 
-**timestamp:** the timestamp in UNIX format expressed in milliseconds from when download the readings. If it is not expressed, the script downloads the readings from the timestamp of the last downloaded reading +1ms, while if it is the first iteration the default value if current timestamp - 3 days.
+**timestamp:** the timestamp in UNIX format expressed in milliseconds from when download the readings. If it is not expressed, the script downloads the readings from the timestamp of the last downloaded reading +1ms, while if it is the first iteration the default value of current timestamp minus 3 days.
 
 #### Notes
 
 The script creates a table inside a database for each meaning of your device.
-Note that the script creates a file called `history_downloader_settings.db`. It is a Berkeley DB creadted through the shelve module of Python. It should be created in the folder where you run the script and it cointains the timestamp of the last reading received.
+Note that the script creates also a file called `history_downloader_settings.db`. It is a Berkeley DB creadted through the shelve module of Python. It should be found in the folder where you run the script and it cointains the timestamp of the last reading received.
 
 ## License
 <!--The license under which the software will be released. Open-source projects MUST include the MIT License, and closed-source projects MUST include a proprietary license to be discussed with the Documentation team.
