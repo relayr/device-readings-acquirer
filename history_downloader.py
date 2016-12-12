@@ -53,7 +53,7 @@ def main():
 
         data = []
         count = 0
-        API_2 = False
+        API_2 = True
         tmp_last_timestamp = 0
 
         #   Control of the last timestamp or the given one if parsed arg

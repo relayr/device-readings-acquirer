@@ -43,7 +43,7 @@ You can install with PIP the last version directly from [GitHub](https://github.
 
 	# pip install git+https://github.com/relayr/python-sdk
 
-### 3) Run the script
+### 4) Run the script
 For running the script you have just to browse with your terminal into the folder where you have the script and launch the command, for example:
 
 	$ python3 history_downloader.py --token 1234567890 --device 0987654321 --db DBname --norm 100 --freq 3000
