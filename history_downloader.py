@@ -1,16 +1,12 @@
 """
-Relayr To InfluxDB Inflater v2.0.0
+Relayr to InfluxDB History Downloader v2.0.2
 
-This script is a bridge between the relayr cloud and a local instance of InfluxDB.
+This script is a bridge between the Relayr cloud and a local instance of InfluxDB.
 It downloads the data of a certain device and store them in local.
 
-Last Edit: 09 Dec 2016 01.15
+Last Edit: 12 Dec 2016 10.30
 
 Copyright Riccardo Marconcini (riccardo DOT marconcini AT relayr DOT de)
-
-#todo: fix ISO and UNIX conversion with nanoseconds
-#todo: update readme
-#todo: add comments on code
 """
 
 
@@ -29,7 +25,7 @@ from influxdb import InfluxDBClient
 
 
 #######################################################################################################################
-#   Global Parameters                                                                                                 #
+#   Global Variables                                                                                                  #
 #######################################################################################################################
 
 TOKEN = ""
@@ -39,7 +35,7 @@ FREQ_CHECKING = 0
 HOST = ""
 STARTING_TIMESTAMP = 0
 PORT = 0
-NORM = 0
+NORM = 1
 
 
 #######################################################################################################################
@@ -48,7 +44,7 @@ NORM = 0
 
 def main():
     """ Main function is an endless loop. First it checks if there is a timestamp of the last downloaded reading, then
-        it query the relayr cloud if there are new readings. Then it parses the result JSON and insert the reading in
+        it queries the relayr cloud if there are new readings. Then it parses the result JSON and insert the reading in
         InfluxDB database.
     :return: None
     """
@@ -60,7 +56,7 @@ def main():
         API_2 = False
         tmp_last_timestamp = 0
 
-        #   Control of the last timestamp, add the parsed args
+        #   Control of the last timestamp or the given one if parsed arg
         try:
             if STARTING_TIMESTAMP != 0:
                 last_timestamp = STARTING_TIMESTAMP
@@ -83,7 +79,7 @@ def main():
                 print("Database not ready... retry.")
 
         #   Loop that checks if History API 1 are correctly running and then it gets the readings of a device from a
-        #   certain timestamp
+        #   certain timestamp. After 10 fails, it switches to API 2
         api_fail = 0
         while True:
             try:
@@ -100,7 +96,7 @@ def main():
                     API_2 = True
                     break
 
-        #   I parse the json if I used API v 1
+        #   Parse the JSON if API 1 were used and append to data variable
         if not API_2:
             try:
                 for i in range(len(history['results'])):
@@ -115,7 +111,6 @@ def main():
             except:
                 print("Error Parsing with API v 1...")
 
-
         #   Switch to History API 2 for the request after 10 fails of History API 1
         if API_2:
 
@@ -123,6 +118,7 @@ def main():
             while True:
                 try:
                     print("Start downloading data")
+
                     #   Request the device info to retrieve the model ID
                     device_info = requests.get('https://api.relayr.io/devices/'+DEVICE_ID,
                          headers={"authorization": "Bearer "+TOKEN,
@@ -138,8 +134,8 @@ def main():
                     for i in range(len(model_info_json['firmware']['1.0.0']['transport']['cloud']['readings'])):
                         meanings.append(model_info_json['firmware']['1.0.0']['transport']['cloud']['readings'][i]['meaning'])
 
-                    #   For every meaning the script performs a request to history API 2 and parse the readings into a
-                    #   variable data
+                    #   For every meaning the script performs a request to history API 2 and parse the readings into the
+                    #   data var
                     for i in range(len(meanings)):
                         readings = requests.get('https://api.relayr.io/devices/'+DEVICE_ID+'/aggregated-readings?meaning='
                                                 +meanings[i]+'&start='+to_iso(last_timestamp)
@@ -166,8 +162,8 @@ def main():
             influxClient.write_points(data, database=DB_NAME, time_precision="ms")
             print("Added ", count, " new rows in database")
             if count > 0:
-                # increasing the timestamp of 1ms before save to avoid to insert again that reading during next
-                # iteration
+                #   Increasing the timestamp of 1ms before save to avoid to insert again that reading during next
+                #   iteration
                 if API_2:
                     tmp_unix = to_unix(tmp_last_timestamp)
                     set_last_timestamp(tmp_unix+1)
@@ -178,8 +174,10 @@ def main():
         except Exception:
             print("Error Writing")
 
+        #   Reset the START_TIME, if the script is launched with --timestamp, it is used only for the first iteration
         reset_starttime()
 
+        #   Sleep
         print("Sleeping for the next ", FREQ_CHECKING, " seconds... \n")
         time.sleep(FREQ_CHECKING)
 
@@ -220,6 +218,9 @@ def get_last_timestamp():
 
 #   Return current time in milliseconds
 def current_milli_time():
+    """ Generate the current timestamp into milliseconds
+    :return: current milliseconds since Epoch
+    """
     return int(round(time.time() * 1000))
 
 
@@ -235,14 +236,20 @@ def to_iso(unixtime):
 
 #    Convert the UNIX time in ms into ISO format
 def to_unix(isodate):
+    """ The function converts the ISO timestamp into UNIX timestamp
+    :param isodate: timestamp in ISO format with T after date and Z after time
+    :return: the time in UNIX format
+    """
     unixtime = calendar.timegm(datetime.strptime(isodate, "%Y-%m-%dT%H:%M:%S.%fZ").timetuple())
     unixtime *= 1000
     return unixtime
 
 
-
 #   Reset the STARTTIME global variable to 0
 def reset_starttime():
+    """ The function set to 0 the global variable STARTING_TIMESTAMP
+    :return: None
+    """
     global STARTING_TIMESTAMP
     STARTING_TIMESTAMP = 0
 
@@ -272,6 +279,7 @@ def parse_args():
 #######################################################################################################################
 
 if __name__ == '__main__':
+    #   Assign passed parameters to global variables
     args = parse_args()
     TOKEN = args.token
     DEVICE_ID = args.device
@@ -282,3 +290,4 @@ if __name__ == '__main__':
     NORM = args.norm
     STARTING_TIMESTAMP = args.timestamp
     main()
+
