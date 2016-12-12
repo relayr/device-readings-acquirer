@@ -68,6 +68,7 @@ Output example:
 |    --port   | int |    no   |    8086     |                   --port 4000                  |
 |    --norm   | int |    no   |     1    |                   --norm 100                  |
 |    --timestamp   | int |    no   |     0    |                   --timestamp 1481031795001                  |
+|    --force   | bool |    no   |     False    |                   --force True                  |
 
 **token:** the account token you can find in your account page in relayr
 dashboard;
@@ -84,7 +85,9 @@ dashboard;
 
 **norm:** if the readings on the cloud need to be normalized, this is the factor to divide the readings;
 
-**timestamp:** the timestamp in UNIX format expressed in milliseconds from when download the readings. If it is not expressed, the script downloads the readings from the timestamp of the last downloaded reading +1ms, while if it is the first iteration the default value of current timestamp minus 3 days.
+**timestamp:** the timestamp in UNIX format expressed in milliseconds from when download the readings. If it is not expressed, the script downloads the readings from the timestamp of the last downloaded reading +1ms, while if it is the first iteration the default value of current timestamp minus 3 days;
+
+**force:** if set True, the usage of API v2 is forced (not recommended).
 
 #### Notes
 

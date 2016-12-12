@@ -1,10 +1,10 @@
 """
-Relayr to InfluxDB History Downloader v2.0.2
+Relayr to InfluxDB History Downloader v2.0.3
 
 This script is a bridge between the Relayr cloud and a local instance of InfluxDB.
 It downloads the data of a certain device and store them in local.
 
-Last Edit: 12 Dec 2016 10.30
+Last Edit: 12 Dec 2016 00.02
 
 Copyright Riccardo Marconcini (riccardo DOT marconcini AT relayr DOT de)
 """
@@ -36,6 +36,7 @@ HOST = ""
 STARTING_TIMESTAMP = 0
 PORT = 0
 NORM = 1
+FORCE = False
 
 
 #######################################################################################################################
@@ -54,6 +55,8 @@ def main():
         data = []
         count = 0
         API_2 = False
+        if FORCE:
+            API_2 = True
         tmp_last_timestamp = 0
 
         #   Control of the last timestamp or the given one if parsed arg
@@ -271,6 +274,7 @@ def parse_args():
     parser.add_argument('--device', type=str, required=True, default=0, help="Device")
     parser.add_argument('--norm', type=int, required=False, default=1, help="Normalization value to divide the reading")
     parser.add_argument('--timestamp', type=int, required=False, default=0, help="Starting Timestamp")
+    parser.add_argument('--force', type=bool, required=False, default=False, help="Force to use the Api v2 (not recommended)")
     return parser.parse_args()
 
 
@@ -289,5 +293,6 @@ if __name__ == '__main__':
     PORT = args.port
     NORM = args.norm
     STARTING_TIMESTAMP = args.timestamp
+    FORCE = args.force
     main()
 
