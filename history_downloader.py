@@ -142,6 +142,7 @@ def main():
                     #   For every meaning the script performs a request to history API 2 and parse the readings into the
                     #   data var
                     for i in range(len(meanings)):
+                        print(to_iso(last_timestamp))
                         readings = requests.get('https://api.relayr.io/devices/'+DEVICE_ID+'/aggregated-readings?meaning='
                                                 +meanings[i]+'&start='+to_iso(last_timestamp)
                                                 +'&interval=10s&aggregates=avg',
@@ -235,7 +236,7 @@ def to_iso(unixtime):
     :param unixtime: UNIX time expressed in milliseconds
     :return: the time in ISO format
     """
-    isodate = datetime.fromtimestamp(float(unixtime/1000)).isoformat()
+    isodate = datetime.utcfromtimestamp(float(unixtime/1000)).isoformat()
     return isodate
 
 
