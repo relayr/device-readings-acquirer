@@ -142,7 +142,6 @@ def main():
                     #   For every meaning the script performs a request to history API 2 and parse the readings into the
                     #   data var
                     for i in range(len(meanings)):
-                        print(to_iso(last_timestamp))
                         readings = requests.get('https://api.relayr.io/devices/'+DEVICE_ID+'/aggregated-readings?meaning='
                                                 +meanings[i]+'&start='+to_iso(last_timestamp)
                                                 +'&interval=10s&aggregates=avg',
