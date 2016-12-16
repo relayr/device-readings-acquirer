@@ -7,6 +7,8 @@ It downloads the data of a certain device and store them in local.
 Last Edit: 12 Dec 2016 00.02
 
 Copyright Riccardo Marconcini (riccardo DOT marconcini AT relayr DOT de)
+
+TODO: add how many rows are added for each meaning
 """
 
 
@@ -198,7 +200,7 @@ def set_last_timestamp(timestamp):
     """
     s = shelve.open('history_downloader_settings')
     try:
-        s['settings'] = {'last_timestamp': timestamp}
+        s[DB_NAME] = {'last_timestamp': timestamp}
     except:
         print("Impossible to create settings file")
     finally:
@@ -213,7 +215,7 @@ def get_last_timestamp():
     """
     s = shelve.open('history_downloader_settings')
     try:
-        existing = s['settings']['last_timestamp']
+        existing = s[DB_NAME]['last_timestamp']
     finally:
         s.close()
     return existing
