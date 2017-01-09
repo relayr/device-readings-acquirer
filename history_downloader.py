@@ -1,14 +1,15 @@
 """
-Relayr to InfluxDB History Downloader v2.0.3
+Relayr to InfluxDB History Downloader v2.1.0
 
 This script is a bridge between the Relayr cloud and a local instance of InfluxDB.
 It downloads the data of a certain device and store them in local.
 
-Last Edit: 12 Dec 2016 00.02
+Last Edit: 06 Jan 2017 18.00 CET
 
 Copyright Riccardo Marconcini (riccardo DOT marconcini AT relayr DOT de)
 
 TODO: add how many rows are added for each meaning
+TODO: renew token
 """
 
 
@@ -22,7 +23,6 @@ import shelve
 import requests
 from datetime import datetime
 import calendar
-from relayr.api import Api
 from influxdb import InfluxDBClient
 
 
@@ -38,7 +38,6 @@ HOST = ""
 STARTING_TIMESTAMP = 0
 PORT = 0
 NORM = 1
-FORCE = False
 
 
 #######################################################################################################################
@@ -56,9 +55,6 @@ def main():
 
         data = []
         count = 0
-        API_2 = False
-        if FORCE:
-            API_2 = True
         tmp_last_timestamp = 0
 
         #   Control of the last timestamp or the given one if parsed arg
@@ -83,84 +79,49 @@ def main():
             except:
                 print("Database not ready... retry.")
 
-        #   Loop that checks if History API 1 are correctly running and then it gets the readings of a device from a
-        #   certain timestamp. After 10 fails, it switches to API 2
-        api_fail = 0
         while True:
             try:
-                time.sleep(5)
-                api = Api(TOKEN)
                 print("Start downloading data")
-                history = api.get_history_devices(DEVICE_ID, last_timestamp, None, None, None, None, None, None)
-                break
-            except:
-                history = []
-                print("API error... retry.")
-                api_fail += 1
-                if api_fail == 10:
-                    API_2 = True
-                    break
 
-        #   Parse the JSON if API 1 were used and append to data variable
-        if not API_2:
-            try:
-                for i in range(len(history['results'])):
-                    for k in range(len(history['results'][i]['points'])):
+                time.sleep(5)
+
+                #   Request the device info to retrieve the model ID
+                device_info = requests.get('https://api.relayr.io/devices/'+DEVICE_ID,
+                     headers={"authorization": "Bearer "+TOKEN,
+                              "cache-control": "no-cache"})
+                device_info_json = device_info.json()
+
+                #   Request the model ID to retrieve the meanings
+                model_info = requests.get('https://api.relayr.io/device-models/'+device_info_json['modelId'],
+                     headers={"authorization": "Bearer "+TOKEN,
+                              "cache-control": "no-cache"})
+                model_info_json = model_info.json()
+                meanings = []
+                for i in range(len(model_info_json['firmware']['1.0.0']['transport']['cloud']['readings'])):
+                    meanings.append(model_info_json['firmware']['1.0.0']['transport']['cloud']['readings'][i]['meaning'])
+
+                #   For every meaning the script performs a request to history API 2 and parse the readings into the
+                #   data var
+                for i in range(len(meanings)):
+                    readings = requests.get('https://api.relayr.io/devices/' + DEVICE_ID + '/aggregated-readings?meaning='
+                                            + meanings[i] + '&start=' + to_iso(last_timestamp)
+                                            + '&interval=10s&aggregates=avg',
+                     headers={"authorization": "Bearer "+TOKEN, "accepted": "application/json"})
+                    readings_json = readings.json()
+
+                    for k in range(len(readings_json['data'])):
                         data.append({
-                            'measurement': history['results'][i]['meaning'],
-                            'time': history['results'][i]['points'][k]['timestamp'],
-                            'fields': {'value': history['results'][i]['points'][k]['value']/NORM}
+                            'measurement': meanings[i],
+                            'time': readings_json['data'][k]['timestamp'],
+                            'fields': {'value': readings_json['data'][k]['avg']/NORM}
                         })
                         count += 1
-                        tmp_last_timestamp = history['results'][i]['points'][k]['timestamp']
+                        tmp_last_timestamp = readings_json['data'][k]['timestamp']
+                break
             except:
-                print("Error Parsing with API v 1...")
-
-        #   Switch to History API 2 for the request after 10 fails of History API 1
-        if API_2:
-
-            print("Using now API v 2")
-            while True:
-                try:
-                    print("Start downloading data")
-
-                    #   Request the device info to retrieve the model ID
-                    device_info = requests.get('https://api.relayr.io/devices/'+DEVICE_ID,
-                         headers={"authorization": "Bearer "+TOKEN,
-                                  "cache-control": "no-cache"})
-                    device_info_json = device_info.json()
-
-                    #   Request the model ID to retrieve the meanings
-                    model_info = requests.get('https://api.relayr.io/device-models/'+device_info_json['modelId'],
-                         headers={"authorization": "Bearer "+TOKEN,
-                                  "cache-control": "no-cache"})
-                    model_info_json = model_info.json()
-                    meanings = []
-                    for i in range(len(model_info_json['firmware']['1.0.0']['transport']['cloud']['readings'])):
-                        meanings.append(model_info_json['firmware']['1.0.0']['transport']['cloud']['readings'][i]['meaning'])
-
-                    #   For every meaning the script performs a request to history API 2 and parse the readings into the
-                    #   data var
-                    for i in range(len(meanings)):
-                        readings = requests.get('https://api.relayr.io/devices/'+DEVICE_ID+'/aggregated-readings?meaning='
-                                                +meanings[i]+'&start='+to_iso(last_timestamp)
-                                                +'&interval=10s&aggregates=avg',
-                         headers={"authorization": "Bearer "+TOKEN, "accepted": "application/json"})
-                        readings_json = readings.json()
-
-                        for k in range(len(readings_json['data'])):
-                            data.append({
-                                'measurement':meanings[i],
-                                'time': readings_json['data'][k]['timestamp'],
-                                'fields': {'value': readings_json['data'][k]['avg']/NORM}
-                            })
-                            count += 1
-                            tmp_last_timestamp = readings_json['data'][k]['timestamp']
-                    break
-                except:
-                    print("Error with API v 2... retry.")
-                    meanings = []
-                    data = []
+                print("Error with API... retry.")
+                meanings = []
+                data = []
 
         #   Writing the data parsed into the database specified as parameter
         try:
@@ -169,14 +130,11 @@ def main():
             if count > 0:
                 #   Increasing the timestamp of 1ms before save to avoid to insert again that reading during next
                 #   iteration
-                if API_2:
-                    tmp_unix = to_unix(tmp_last_timestamp)
-                    set_last_timestamp(tmp_unix+1)
-                    print("New Last Timestamp: ", tmp_unix+1)
-                else:
-                    set_last_timestamp(tmp_last_timestamp+1)
-                    print("New Last Timestamp: ", tmp_last_timestamp+1)
-        except Exception:
+
+                tmp_unix = to_unix(tmp_last_timestamp)
+                set_last_timestamp(tmp_unix+1)
+                print("New Last Timestamp: ", tmp_unix+1)
+        except:
             print("Error Writing")
 
         #   Reset the START_TIME, if the script is launched with --timestamp, it is used only for the first iteration
@@ -276,7 +234,6 @@ def parse_args():
     parser.add_argument('--device', type=str, required=True, default=0, help="Device")
     parser.add_argument('--norm', type=int, required=False, default=1, help="Normalization value to divide the reading")
     parser.add_argument('--timestamp', type=int, required=False, default=0, help="Starting Timestamp")
-    parser.add_argument('--force', type=bool, required=False, default=False, help="Force to use the Api v2 (not recommended)")
     return parser.parse_args()
 
 
@@ -295,6 +252,4 @@ if __name__ == '__main__':
     PORT = args.port
     NORM = args.norm
     STARTING_TIMESTAMP = args.timestamp
-    FORCE = args.force
     main()
-
