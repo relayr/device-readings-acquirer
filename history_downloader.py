@@ -87,14 +87,14 @@ def main():
 
                 #   Request the device info to retrieve the model ID
                 device_info = requests.get('https://api.relayr.io/devices/'+DEVICE_ID,
-                     headers={"authorization": "Bearer "+TOKEN,
-                              "cache-control": "no-cache"})
+                                           headers={"authorization": "Bearer "+TOKEN,
+                                                    "cache-control": "no-cache"})
                 device_info_json = device_info.json()
 
                 #   Request the model ID to retrieve the meanings
                 model_info = requests.get('https://api.relayr.io/device-models/'+device_info_json['modelId'],
-                     headers={"authorization": "Bearer "+TOKEN,
-                              "cache-control": "no-cache"})
+                                          headers={"authorization": "Bearer "+TOKEN,
+                                                   "cache-control": "no-cache"})
                 model_info_json = model_info.json()
                 meanings = []
                 for i in range(len(model_info_json['firmware']['1.0.0']['transport']['cloud']['readings'])):
@@ -103,10 +103,10 @@ def main():
                 #   For every meaning the script performs a request to history API 2 and parse the readings into the
                 #   data var
                 for i in range(len(meanings)):
-                    readings = requests.get('https://api.relayr.io/devices/' + DEVICE_ID + '/aggregated-readings?meaning='
-                                            + meanings[i] + '&start=' + to_iso(last_timestamp)
-                                            + '&interval=10s&aggregates=avg',
-                     headers={"authorization": "Bearer "+TOKEN, "accepted": "application/json"})
+                    readings = requests.get('https://api.relayr.io/devices/' + DEVICE_ID
+                                            + '/aggregated-readings?meaning=' + meanings[i] + '&start='
+                                            + to_iso(last_timestamp) + '&interval=10s&aggregates=avg',
+                                            headers={"authorization": "Bearer "+TOKEN, "accepted": "application/json"})
                     readings_json = readings.json()
 
                     for k in range(len(readings_json['data'])):
