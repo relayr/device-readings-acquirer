@@ -4,7 +4,7 @@ Relayr to InfluxDB History Downloader v2.1.0
 This script is a bridge between the Relayr cloud and a local instance of InfluxDB.
 It downloads the data of a certain device and store them in local.
 
-Last Edit: 06 Jan 2017 18.00 CET
+Last Edit: 25 Jan 2017 18.36 CET
 
 Copyright Riccardo Marconcini (riccardo DOT marconcini AT relayr DOT de)
 
@@ -86,27 +86,33 @@ def main():
                 time.sleep(5)
 
                 #   Request the device info to retrieve the model ID
-                device_info = requests.get('https://api.relayr.io/devices/'+DEVICE_ID,
-                                           headers={"authorization": "Bearer "+TOKEN,
+                device_info = requests.get('https://api.relayr.io/devices/' + DEVICE_ID,
+                                           headers={"authorization": "Bearer " + TOKEN,
                                                     "cache-control": "no-cache"})
                 device_info_json = device_info.json()
 
                 #   Request the model ID to retrieve the meanings
-                model_info = requests.get('https://api.relayr.io/device-models/'+device_info_json['modelId'],
-                                          headers={"authorization": "Bearer "+TOKEN,
+                model_info = requests.get('https://api.relayr.io/device-models/' + device_info_json['modelId'],
+                                          headers={"authorization": "Bearer " + TOKEN,
                                                    "cache-control": "no-cache"})
                 model_info_json = model_info.json()
                 meanings = []
                 for i in range(len(model_info_json['firmware']['1.0.0']['transport']['cloud']['readings'])):
                     meanings.append(model_info_json['firmware']['1.0.0']['transport']['cloud']['readings'][i]['meaning'])
 
+                if len(last_timestamp) > 11:
+                    start_timestamp_iso = last_timestamp
+                else:
+                    start_timestamp_iso = to_iso(last_timestamp)
+
                 #   For every meaning the script performs a request to history API 2 and parse the readings into the
                 #   data var
                 for i in range(len(meanings)):
                     readings = requests.get('https://api.relayr.io/devices/' + DEVICE_ID
-                                            + '/aggregated-readings?meaning=' + meanings[i] + '&start='
-                                            + to_iso(last_timestamp) + '&interval=10s&aggregates=avg',
-                                            headers={"authorization": "Bearer "+TOKEN, "accepted": "application/json"})
+                                            + '/aggregated-readings?meaning=' + meanings[i]
+                                            + '&start=' + start_timestamp_iso
+                                            + '&interval=10s&aggregates=avg',
+                                            headers={"authorization": "Bearer " + TOKEN, "accepted": "application/json"})
                     readings_json = readings.json()
 
                     for k in range(len(readings_json['data'])):
@@ -208,6 +214,20 @@ def to_unix(isodate):
     return unixtime
 
 
+def validate_isodate(isodate):
+    """ The function check if a date is
+    :param isodate: timestamp in a format to check if the date is in ISO format
+    :return: Boolean, False if the date is invalid
+    """
+    try:
+        datetime.strptime(isodate, "%Y-%m-%dT%H:%M:%S.%fZ")
+    except ValueError:
+        pass
+        print("Incorrect data format, should be YYYY-mm-ddTHH:MM:SS.Z")
+        return False
+    return True
+
+
 #   Reset the STARTTIME global variable to 0
 def reset_starttime():
     """ The function set to 0 the global variable STARTING_TIMESTAMP
@@ -230,10 +250,11 @@ def parse_args():
     parser.add_argument('--freq', type=int, required=False, default=60, help="Frequency of checking the cloud, in s")
     parser.add_argument('--host', type=str, required=False, default="localhost", help="Hostname of InfluxDB")
     parser.add_argument('--port', type=int, required=False, default=8086, help="Port of InfluxDB")
-    parser.add_argument('--token', type=str, required=True, default="", help="Token in relayr dashboard")
+    parser.add_argument('--token', type=str, required=True, default="", help="Token in relayr Dashboard")
     parser.add_argument('--device', type=str, required=True, default=0, help="Device")
     parser.add_argument('--norm', type=int, required=False, default=1, help="Normalization value to divide the reading")
     parser.add_argument('--timestamp', type=int, required=False, default=0, help="Starting Timestamp")
+    parser.add_argument('--timestampISO', type=str, required=False, default=0, help="Starting Timestamp in ISO format")
     return parser.parse_args()
 
 
@@ -251,5 +272,11 @@ if __name__ == '__main__':
     HOST = args.host
     PORT = args.port
     NORM = args.norm
-    STARTING_TIMESTAMP = args.timestamp
+    if STARTING_TIMESTAMP != 0:
+        STARTING_TIMESTAMP = args.timestamp
+    else:
+        STARTING_TIMESTAMP = args.timestampISO
+    if len(STARTING_TIMESTAMP) > 11:
+        if not validate_isodate(STARTING_TIMESTAMP):
+            exit()
     main()

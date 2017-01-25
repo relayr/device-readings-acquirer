@@ -4,6 +4,9 @@
 <!--A brief description of the purpose and functionality of the project.-->
 The History Downloader is a script written in Python that downloads the readings of a given device registered in the relayr cloud and store them into your local instance of InfluxDB.
 
+Relayr created this for giving the possibility to save easily the readings into a time series database and use it for analytics, data management or other purposes.
+The database chosen is InfluxDB because it is open source, very stable and with many integrations (e.g. Grafana).
+
 ## Requirements
 <!--A list of all system requirements and required third-party components.
 -->
@@ -63,9 +66,10 @@ Output example:
 |    --port   | int |    no   |    8086     |                   --port 4000                  |
 |    --norm   | int |    no   |     1    |                   --norm 100                  |
 |    --timestamp   | int |    no   |     0    |                   --timestamp 1481031795001                  |
+|    --timestampISO   | string |    no   |     0    |                   --timestampISO 2017.01.25T18:33:20.00Z                  |
 
 **token:** the account token you can find in your account page in relayr
-dashboard;
+Dashboard;
 
 **device:** the device ID on relayr dashboard;
 
@@ -79,18 +83,23 @@ dashboard;
 
 **norm:** if the readings on the cloud need to be normalized, this is the factor to divide the readings;
 
-**timestamp:** the timestamp in UNIX format expressed in milliseconds from when download the readings. If it is not expressed, the script downloads the readings from the timestamp of the last downloaded reading +1ms, while if it is the first iteration the default value of current timestamp minus 3 days.
+**timestamp:** the timestamp in UNIX format expressed in milliseconds from when download the readings;
+
+**timestampISO:** the timestamp in ISO format from when download the readings.
+
+If either *timestamp* or *timestampISO* are not defined, the script downloads the readings from the timestamp of the last downloaded reading +1ms, while if it is the first iteration the default value of current timestamp minus 3 days.
+
 
 #### Notes
 
 The script creates a table inside a database for each meaning of your device.
-Note that the script creates also a file called `history_downloader_settings.db`. It is a Berkeley DB creadted through the shelve module of Python. It should be found in the folder where you run the script and it cointains the timestamp of the last reading received.
+Note that the script creates also a file called `history_downloader_settings.db`. It is a Berkeley DB created through the shelve module of Python. It should be found in the folder where you run the script and it cointains the timestamp of the last reading received.
 
 ## License
 <!--The license under which the software will be released. Open-source projects MUST include the MIT License, and closed-source projects MUST include a proprietary license to be discussed with the Documentation team.
 -->
 The MIT License (MIT)
-Copyright (c) 2016 relayr Inc., Riccardo Marconcini [riccardo DOT marconcini AT relayr DOT de](mailto:riccardo.marconcini@relayr.de)
+Copyright (c) 2017 relayr Inc., Riccardo Marconcini [riccardo DOT marconcini AT relayr DOT de](mailto:riccardo.marconcini@relayr.de)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
