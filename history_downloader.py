@@ -60,13 +60,16 @@ def main():
         #   Control of the last timestamp or the given one if parsed arg
         try:
             if STARTING_TIMESTAMP != 0:
-                last_timestamp = STARTING_TIMESTAMP
+                if isinstance(STARTING_TIMESTAMP, int):
+                    last_timestamp = STARTING_TIMESTAMP
+                else:
+                    last_timestamp = to_unix(STARTING_TIMESTAMP)
             else:
                 last_timestamp = get_last_timestamp()
         except:
             print("Last timestamp not found. Setting as default three days ago...")
             last_timestamp = (current_milli_time() - 259200000)
-        print("Last Timestamp: ", last_timestamp)
+        print("Last Timestamp: ", last_timestamp, to_iso(last_timestamp))
 
         #   Loop for checking if InfluxDB is running, exit from the loop when the InfluxDB Client is established
         while True:
@@ -100,17 +103,12 @@ def main():
                 for i in range(len(model_info_json['firmware']['1.0.0']['transport']['cloud']['readings'])):
                     meanings.append(model_info_json['firmware']['1.0.0']['transport']['cloud']['readings'][i]['meaning'])
 
-                if len(last_timestamp) > 11:
-                    start_timestamp_iso = last_timestamp
-                else:
-                    start_timestamp_iso = to_iso(last_timestamp)
-
                 #   For every meaning the script performs a request to history API 2 and parse the readings into the
                 #   data var
                 for i in range(len(meanings)):
                     readings = requests.get('https://api.relayr.io/devices/' + DEVICE_ID
                                             + '/aggregated-readings?meaning=' + meanings[i]
-                                            + '&start=' + start_timestamp_iso
+                                            + '&start=' + to_iso(last_timestamp)
                                             + '&interval=10s&aggregates=avg',
                                             headers={"authorization": "Bearer " + TOKEN, "accepted": "application/json"})
                     readings_json = readings.json()
@@ -254,7 +252,7 @@ def parse_args():
     parser.add_argument('--device', type=str, required=True, default=0, help="Device")
     parser.add_argument('--norm', type=int, required=False, default=1, help="Normalization value to divide the reading")
     parser.add_argument('--timestamp', type=int, required=False, default=0, help="Starting Timestamp")
-    parser.add_argument('--timestampISO', type=str, required=False, default=0, help="Starting Timestamp in ISO format")
+    parser.add_argument('--timestampISO', type=str, required=False, default="", help="Starting Timestamp in ISO format")
     return parser.parse_args()
 
 
@@ -272,11 +270,12 @@ if __name__ == '__main__':
     HOST = args.host
     PORT = args.port
     NORM = args.norm
-    if STARTING_TIMESTAMP != 0:
+    if args.timestamp != 0:
         STARTING_TIMESTAMP = args.timestamp
-    else:
+    if args.timestampISO != "":
         STARTING_TIMESTAMP = args.timestampISO
-    if len(STARTING_TIMESTAMP) > 11:
         if not validate_isodate(STARTING_TIMESTAMP):
             exit()
+    if args.timestamp == 0 and args.timestampISO == 0:
+        STARTING_TIMESTAMP == 0
     main()

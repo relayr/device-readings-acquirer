@@ -66,7 +66,7 @@ Output example:
 |    --port   | int |    no   |    8086     |                   --port 4000                  |
 |    --norm   | int |    no   |     1    |                   --norm 100                  |
 |    --timestamp   | int |    no   |     0    |                   --timestamp 1481031795001                  |
-|    --timestampISO   | string |    no   |     0    |                   --timestampISO 2017.01.25T18:33:20.00Z                  |
+|    --timestampISO   | string |    no   |     0    |                   --timestampISO 2017.01.25T18:33:20.000000                  |
 
 **token:** the account token you can find in your account page in relayr
 Dashboard;
