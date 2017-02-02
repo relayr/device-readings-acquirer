@@ -60,13 +60,14 @@ Output example:
 |:---------:|:------:|:--------:|:-------:|:----------------------------------------------:|
 |  --token  | string |    yes   |         |       --token P7hTR4rgf5P670q5MzYkNogs8K       |
 |  --device | string |    yes   |         | --device 1112a222-3333-4455-6666-777f7f7f7fff7 |
-|    --db   | string |    yes   |         |                   --db dbname                  |
+|    --db   | string |    yes   |         |                   --db 484cb845-cf5b-4125-9add-e16e8330c342                  |
+|    --appID   | string |    yes   |         |                   --db dbname                  |
 |    --freq   | int |    no   |    60     |                   --freq 3000                  |
 |    --host   | string |    no   |     localhost    |                   --host 127.1.4.3                  |
 |    --port   | int |    no   |    8086     |                   --port 4000                  |
 |    --norm   | int |    no   |     1    |                   --norm 100                  |
 |    --timestamp   | int |    no   |     0    |                   --timestamp 1481031795001                  |
-|    --timestampISO   | string |    no   |     0    |                   --timestampISO 2017.01.25T18:33:20.000000                  |
+|    --timestampISO   | string |    no   |     0    |                   --timestampISO 2017.01.25T18:33:20.000Z                  |
 
 **token:** the account token you can find in your account page in relayr
 Dashboard;
