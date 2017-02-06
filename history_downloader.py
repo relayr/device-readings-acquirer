@@ -1,10 +1,10 @@
 """
-Relayr to InfluxDB History Downloader v2.2.0
+Relayr to InfluxDB History Downloader v2.2.2
 
 This script is a bridge between the Relayr cloud and a local instance of InfluxDB.
 It downloads the data of a certain device and store them in local.
 
-Last Edit: 02 Feb 2017 16.30 CET
+Last Edit: 06 Feb 2017 12.37 CET
 
 Copyright Riccardo Marconcini (riccardo DOT marconcini AT relayr DOT de)
 
@@ -34,9 +34,9 @@ DEVICE_ID = ""
 DB_NAME = ""
 FREQ_CHECKING = 0
 HOST = ""
-STARTING_TIMESTAMP = 0
 PORT = 0
 NORM = 1
+STARTING_TIMESTAMP = 0
 APP_ID = ""
 EXPIRY_DATE = 0
 
@@ -58,7 +58,7 @@ def main():
         count = 0
         tmp_last_timestamp = 0
 
-        #   Control of the last timestamp or the given one if parsed arg
+        #   Control of the last timestamp or the given one if parsed from command line
         try:
             if STARTING_TIMESTAMP != 0:
                 if isinstance(STARTING_TIMESTAMP, int):
@@ -76,8 +76,10 @@ def main():
         while True:
             try:
                 time.sleep(5)
+
                 influxClient = InfluxDBClient(HOST, PORT, "root", "root")
                 influxClient.create_database(DB_NAME)   # if the database is already existing, the creation is skipped
+
                 print("Connection to InfluxDB established")
                 break
             except:
@@ -89,6 +91,7 @@ def main():
 
                 time.sleep(5)
 
+                #   Get the model ID from the device ID
                 device_info = requests.get('https://api.relayr.io/devices/' + DEVICE_ID,
                                            headers={'authorization': 'Bearer ' + TOKEN,
                                                     "cache-control": "no-cache"})
@@ -99,18 +102,21 @@ def main():
                                           headers={"authorization": "Bearer " + TOKEN,
                                                    "cache-control": "no-cache"})
                 model_info_json = model_info.json()
+
                 meanings = []
                 for i in range(len(model_info_json['firmware']['1.0.0']['transport']['cloud']['readings'])):
-                    meanings.append(model_info_json['firmware']['1.0.0']['transport']['cloud']['readings'][i]['meaning'])
+                    meanings.append(model_info_json['firmware']['1.0.0']['transport']['cloud']
+                                    ['readings'][i]['meaning'])
 
-                #   For every meaning the script performs a request to history API 2 and parse the readings into the
+                #   For every meaning the script performs a request and parse the readings into the
                 #   data var
                 for i in range(len(meanings)):
                     readings = requests.get('https://api.relayr.io/devices/' + DEVICE_ID
                                             + '/aggregated-readings?meaning=' + meanings[i]
                                             + '&start=' + to_iso(last_timestamp)
                                             + '&interval=10s&aggregates=avg',
-                                            headers={"authorization": "Bearer " + TOKEN, "accepted": "application/json"})
+                                            headers={"authorization": "Bearer " + TOKEN,
+                                                     "accepted": "application/json"})
                     readings_json = readings.json()
 
                     for k in range(len(readings_json['data'])):
@@ -131,26 +137,25 @@ def main():
         try:
             influxClient.write_points(data, database=DB_NAME, time_precision="ms")
             print("Added ", count, " new rows in database")
+
             if count > 0:
+
                 #   Increasing the timestamp of 1ms before save to avoid to insert again that reading during next
                 #   iteration
-
                 tmp_unix = to_unix(tmp_last_timestamp)
                 set_last_timestamp(tmp_unix+1)
                 print("New Last Timestamp: ", tmp_unix+1)
         except:
-            print("Error Writing")
+            print("Error writing into influxDB")
 
         #   Reset the START_TIME, if the script is launched with --timestamp, it is used only for the first iteration
         reset_starttime()
 
-        #   Check if it is time to get a new token
+        #   If a token will expire up to 30 minutes after the next iteration, a new token will be generated
         if current_milli_time() + (FREQ_CHECKING * 1000) + 1800000 > EXPIRY_DATE:
             request_new_token(TOKEN, APP_ID)
-            token_tmp = get_token()
-            expiry_date_tmp = get_expiry_date()
-            assign_token(token_tmp)
-            assign_expiry_date(expiry_date_tmp)
+            assign_token(get_token())
+            assign_expiry_date(get_expiry_date())
 
         #   Sleep
         print("Sleeping for the next ", FREQ_CHECKING, " seconds... \n")
@@ -163,8 +168,7 @@ def main():
 
 #   Set function for the last timestamp using the shelf module
 def set_last_timestamp(timestamp):
-    """ The function saves a timestamp through the shelve module into a file called history_downloader_setting under
-        the key settings as last_timestamp
+    """ The function saves the timestamp through the shelve module
     :param timestamp: int
     :return: None
     """
@@ -172,20 +176,21 @@ def set_last_timestamp(timestamp):
     try:
         s['last_timestamp'] = timestamp
     except:
-        print("Impossible to create settings file. Error with timestamp set.")
+        print("Impossible access to the settings file. Error with timestamp set.")
     finally:
         s.close()
 
 
 #   Get function for the last timestamp using the shelf module
 def get_last_timestamp():
-    """ The function open the file history_downloader_settings through the shelve module and get the value contained
-        as last_timestamp under the key settings
+    """ The function gets the timestamp through the shelve module
     :return: int
     """
     s = shelve.open('history_downloader_settings_' + DB_NAME)
     try:
         existing = s['last_timestamp']
+    except:
+        print("Impossible access to the settings file. Error with timestamp get.")
     finally:
         s.close()
     return existing
@@ -193,7 +198,7 @@ def get_last_timestamp():
 
 #   Request new token function
 def request_new_token(old_token, app_id):
-    """ The function request a new token given an old token, and the app ID
+    """ The function requests a new token given an existing token and the app ID
     :param old_token: string
     :param app_id: string
     :return: None
@@ -203,17 +208,14 @@ def request_new_token(old_token, app_id):
                                           headers={"authorization": "Bearer " + old_token,
                                                    "cache-control": "no-cache"})
         new_token_json = new_token_request.json()
-        token = new_token_json['token']
-        expiry_date = new_token_json['expiryDate']
-        set_token(token, expiry_date)
+        set_token(new_token_json['token'], new_token_json['expiryDate'])
     except:
-        print("Token not valid")
+        print("Error with new token request.")
 
 
 #   Set function for the token using the shelf module
 def set_token(token, expiry_date):
-    """ The function saves the token through the shelve module into a file called history_downloader_setting under
-        the key settings as token
+    """ The function gets the timestamp through the shelve module
     :param token: string
     :param expiry_date: int
     :return: None
@@ -223,7 +225,7 @@ def set_token(token, expiry_date):
         s['token'] = token
         s['expiry_date'] = expiry_date
     except:
-        print("Impossible to create settings file. Error with token set.")
+        print("Impossible to access settings file. Error with token set.")
     finally:
         s.close()
 
@@ -233,6 +235,8 @@ def get_token():
     s = shelve.open('history_downloader_settings_' + DB_NAME)
     try:
         token = s['token']
+    except:
+        print("Impossible to access settings file. Error with token get.")
     finally:
         s.close()
     return token
@@ -243,6 +247,8 @@ def get_expiry_date():
     s = shelve.open('history_downloader_settings_' + DB_NAME)
     try:
         expiry_date = s['expiry_date']
+    except:
+        print("Impossible to access settings file. Error with expiry date get.")
     finally:
         s.close()
     return expiry_date
@@ -254,14 +260,17 @@ def check_appID():
     try:
         found = 'appID' in s
     except:
-        found = False
+        print("Impossible to create settings file. Error with token set.")
     finally:
         s.close()
     return found
 
 
-#   Get function for the last appID using the shelf module
+#   Set the appID using the shelve module
 def set_appID(appID):
+    """ The function return the appID from the shelf module
+    :return: None
+    """
     s = shelve.open('history_downloader_settings_' + DB_NAME)
     try:
         s['appID'] = appID
@@ -271,15 +280,16 @@ def set_appID(appID):
         s.close()
 
 
-# Get function for the last timestamp using the shelf module
+#   Get the appID from the shelve module
 def get_appID():
-    """ The function open the file history_downloader_settings through the shelve module and get the value contained
-        as last_timestamp under the key settings
-    :return: int
+    """ The function return the appID from the shelf module
+    :return: string
     """
     s = shelve.open('history_downloader_settings_' + DB_NAME)
     try:
         app_ID = s['appID']
+    except:
+        print("Impossible to create settings file. Error with appID get.")
     finally:
         s.close()
     return app_ID
@@ -315,9 +325,9 @@ def to_unix(isodate):
 
 
 def validate_isodate(isodate):
-    """ The function check if a date is
+    """ The function check if a string is a date in ISO time format
     :param isodate: timestamp in a format to check if the date is in ISO format
-    :return: Boolean, False if the date is invalid
+    :return: Boolean, False if the date is not in ISO format
     """
     try:
         datetime.strptime(isodate, "%Y-%m-%dT%H:%M:%S.%fZ")
@@ -337,12 +347,20 @@ def reset_starttime():
     STARTING_TIMESTAMP = 0
 
 
+#   Assign the token to the global variable
 def assign_token(token):
+    """ The function set a new token to the corresponding global variable
+    :return: None
+    """
     global TOKEN
     TOKEN = token
 
 
+#   Assign the expiry date to global variable
 def assign_expiry_date(expiry_date):
+    """ The function set a new expiry date to the corresponding global variable
+    :return: None
+    """
     global EXPIRY_DATE
     EXPIRY_DATE = expiry_date
 
@@ -352,73 +370,105 @@ def assign_expiry_date(expiry_date):
 #######################################################################################################################
 
 def parse_args():
-    """ The function parse the args specified in the CLI
+    """ The function parse the args specified in the CLI.
     :return: parsed args
     """
     parser = argparse.ArgumentParser(description="History Downloader from relayr cloud to InfluxDB")
-    parser.add_argument('--db', type=str, required=True, default="", help="Name of database")
-    parser.add_argument('--freq', type=int, required=False, default=60, help="Frequency of checking the cloud, in s")
-    parser.add_argument('--host', type=str, required=False, default="localhost", help="Hostname of InfluxDB")
-    parser.add_argument('--port', type=int, required=False, default=8086, help="Port of InfluxDB")
-    parser.add_argument('--token', type=str, required=True, default="", help="Token in relayr Dashboard")
-    parser.add_argument('--device', type=str, required=True, default=0, help="Device")
-    parser.add_argument('--norm', type=int, required=False, default=1, help="Normalization value to divide the reading")
-    parser.add_argument('--timestamp', type=int, required=False, default=0, help="Starting Timestamp")
+    parser.add_argument('--token', type=str, required=True, help="Authorization token in relayr Dashboard")
+    parser.add_argument('--device', type=str, required=True, help="Device ID in relayr Dashboard")
+    parser.add_argument('--db', type=str, required=True,
+                        help="Name of the local influxDB database where to save the data")
+    parser.add_argument('--freq', type=int, required=False, default=60,
+                        help="How often check the cloud for new readings, expressed in seconds")
+    parser.add_argument('--host', type=str, required=False, default="localhost",
+                        help="Address where is hosted the local instance of InfluxDB")
+    parser.add_argument('--port', type=int, required=False, default=8086,
+                        help="Port where is running the local instance of InfluxDB")
+    parser.add_argument('--norm', type=int, required=False, default=1,
+                        help="Normalization factor to apply to the readings from the cloud")
+    parser.add_argument('--timestamp', type=int, required=False, default=0, help="Starting Timestamp in UNIX format")
     parser.add_argument('--timestampISO', type=str, required=False, default="", help="Starting Timestamp in ISO format")
     return parser.parse_args()
 
 
 #######################################################################################################################
-#   Calling Main Function                                                                                             #
+#   If main statement                                                                                                 #
 #######################################################################################################################
 
 if __name__ == '__main__':
     #   Assign passed parameters to global variables
     args = parse_args()
+    TOKEN = args.token
+    DEVICE_ID = args.device
     DB_NAME = args.db
     FREQ_CHECKING = args.freq
     HOST = args.host
     PORT = args.port
-    TOKEN = args.token
-    DEVICE_ID = args.device
     NORM = args.norm
 
+    #   Assign the timestamp parameter to global variable
     if args.timestamp != 0:
         STARTING_TIMESTAMP = args.timestamp
-    if args.timestampISO != "":
-        STARTING_TIMESTAMP = args.timestampISO
-        if not validate_isodate(STARTING_TIMESTAMP):
+    elif args.timestampISO != "":
+        if not validate_isodate(args.timestampISO):
             exit()
+        else:
+            STARTING_TIMESTAMP = args.timestampISO
     if args.timestamp == 0 and args.timestampISO == 0:
         STARTING_TIMESTAMP == 0
 
+    #   If there is not an App registered on the cloud, the script creates a new app for being able to
+    #   create a new token
     if not check_appID():
-        device_info_req = requests.get('https://api.relayr.io/devices/' + DEVICE_ID,
-                                           headers={"authorization": "Bearer " + TOKEN,
-                                                    "cache-control": "no-cache"})
-        device_info_jsona = device_info_req.json()
 
-        publishers_request = requests.get('https://api.relayr.io/users/' + device_info_jsona['owner'] + "/publishers",
+        #   Get the owner ID given the device ID
+        device_req = requests.get('https://api.relayr.io/devices/' + DEVICE_ID,
+                                  headers={"authorization": "Bearer " + TOKEN,
+                                           "cache-control": "no-cache"})
+        device_json = device_req.json()
+
+        #   Get the publisher ID associated to a give user
+        publishers_request = requests.get('https://api.relayr.io/users/' + device_json['owner'] + "/publishers",
                                           headers={"authorization": "Bearer " + TOKEN,
                                                    "cache-control": "no-cache",
                                                    "Content-Type": "application/json"})
         publishers_json = publishers_request.json()
 
-        app_request = requests.post("https://api.relayr.io/apps",
-                                    headers={"authorization": "Bearer " + TOKEN,
-                                             "cache-control": "no-cache",
-                                             "Content-Type": "application/json"},
-                                    json={"name": "POST app",
-                                          "publisher": publishers_json[0]['id'],
-                                          "redirectUri": "http://relayr.io",
-                                          "description": "App to retrieve a token for History Downloader"})
-        app_request_json = app_request.json()
-        APP_ID = app_request_json['id']
+        #   Get the list of app associated to a given publisher
+        app_list_request = requests.get('https://api.relayr.io/publishers/' + publishers_json[0]['id'] + "/apps",
+                                        headers={"authorization": "Bearer " + TOKEN,
+                                                 "cache-control": "no-cache"})
+        app_list_json = app_list_request.json()
+
+        #   If there is already an existing app for this user, I save its id
+        if len(app_list_json) > 0:
+            APP_ID = app_list_json[0]['id']
+
+        #   Otherwise a new stub app is created for generating the token
+        else:
+
+            app_request = requests.post("https://api.relayr.io/apps",
+                                        headers={"authorization": "Bearer " + TOKEN,
+                                                 "cache-control": "no-cache",
+                                                 "Content-Type": "application/json"},
+                                        json={"name": "POST app",
+                                              "publisher": publishers_json[0]['id'],
+                                              "redirectUri": "http://relayr.io",
+                                              "description": "App to retrieve a token for History Downloader"})
+            app_request_json = app_request.json()
+            APP_ID = app_request_json['id']
+
+        #   Save the App ID
         set_appID(APP_ID)
     else:
+
+        #   Get the App ID
         APP_ID = get_appID()
 
+    #   Request a new token before starting the main, so it is possible to know the expiry date
     request_new_token(TOKEN, APP_ID)
+
+    #   Assign the token and the expiry date to the global variables
     TOKEN = get_token()
     EXPIRY_DATE = get_expiry_date()
 

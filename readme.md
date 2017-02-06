@@ -61,7 +61,6 @@ Output example:
 |  --token  | string |    yes   |         |       --token P7hTR4rgf5P670q5MzYkNogs8K       |
 |  --device | string |    yes   |         | --device 1112a222-3333-4455-6666-777f7f7f7fff7 |
 |    --db   | string |    yes   |         |                   --db 484cb845-cf5b-4125-9add-e16e8330c342                  |
-|    --appID   | string |    yes   |         |                   --db dbname                  |
 |    --freq   | int |    no   |    60     |                   --freq 3000                  |
 |    --host   | string |    no   |     localhost    |                   --host 127.1.4.3                  |
 |    --port   | int |    no   |    8086     |                   --port 4000                  |
@@ -95,6 +94,8 @@ If either *timestamp* or *timestampISO* are not defined, the script downloads th
 
 The script creates a table inside a database for each meaning of your device.
 Note that the script creates also a file called `history_downloader_settings.db`. It is a Berkeley DB created through the shelve module of Python. It should be found in the folder where you run the script and it cointains the timestamp of the last reading received.
+
+The script generates automaticly a new token to ensure that the given one does not expire in the while the script is running. To generate a new token, it is nnecessairy you have at least a project created in your relayr dashboard, but do not worry if you do not have since the script itself will generate a stub app for you.
 
 ## License
 <!--The license under which the software will be released. Open-source projects MUST include the MIT License, and closed-source projects MUST include a proprietary license to be discussed with the Documentation team.
