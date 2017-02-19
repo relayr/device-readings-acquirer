@@ -21,38 +21,44 @@ For the correct use of this script, you must have:
 ### 1) Install the InfluxDB Client for Python
 As written in the official [InfluxDB repository](https://github.com/influxdata/influxdb-python) you can use PIP to install the InfluxDB client:
 
-	# pip install influxdb
+```# pip install influxdb```
 
 or update if you have already installed it:
 
-	# pip install --upgrade influxdb
+```# pip install --upgrade influxdb```
+
+**NOTE**: if you are using MacOS El Capitan or a more recent version and you are not using a virtualenv, please instead use this command:
+	
+```# pip install influxdb --ignore-installed six```
 	
 If you use a Debian/Ubuntu based distribution, you can install via the APT package manager:
 
-	$ sudo apt-get install python-influxdb
+```$ sudo apt-get install python-influxdb```
 	
 ### 2) Install the Requests module for Python
 For install the [Requests](http://docs.python-requests.org/en/master/) module for Python:
 
-	# pip install requests
+```# pip install requests```
 
 or update if you have already installed it:
 
-	# pip install --upgrade requests
+```# pip install --upgrade requests```
 
 
 ### 3) Run the script
 For running the script you have just to browse with your terminal into the folder where you have the script and launch the command, for example:
 
-	$ python3 history_downloader.py --token 1234567890 --device 0987654321 --db DBname --norm 100 --freq 3000
+```$ python3 history_downloader.py --token 1234567890 --device 0987654321 --db DBname --norm 100 --freq 3000```
 	
 Output example:
-	
-	Last Timestamp:  1481533346001
-	Start downloading data
-	Added  98  new rows in database
-	New Last Timestamp:  1481539920001
-	Sleeping for the next  3000  seconds... 
+
+```	
+Last Timestamp:  1481533346001
+Start downloading data
+Added  98  new rows in database
+New Last Timestamp:  1481539920001
+Sleeping for the next  3000  seconds...
+``` 
 	
 #### Parameters
 	
