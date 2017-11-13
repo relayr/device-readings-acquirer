@@ -46,7 +46,7 @@ or update if you have already installed it:
 ### 3) Run the script
 For running the script you have just to browse with your terminal into the folder where you have the script and launch the command, for example:
 
-```$ sudo python3 /path_to/raw-data-downloader.py --device myDEVICE_ID --db myDB --org myORG --password myPASS --user myUSER```
+```$ python3 /path_to/raw-data-downloader.py --device myDEVICE_ID --db myDB --org myORG --password myPASS --user myUSER```
 	
 Output example:
 
