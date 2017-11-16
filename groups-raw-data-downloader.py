@@ -282,7 +282,7 @@ class RawClass(threading.Thread):
         s = shelve.open(str(DB))
         try:
             # Save the timestamp as value, the key is the name of the measurement.
-            s[self.name] = timestamp
+            s[self.devname + '-' + self.name] = timestamp
         except:
             print("Impossible access to the settings file. Error with timestamp set.")
         finally:
@@ -298,7 +298,7 @@ class RawClass(threading.Thread):
         s = shelve.open(str(DB))
         try:
             # Get the value using as key the name of the measurements.
-            existing = s[self.name]
+            existing = s[self.devname + '-' + self.name]
         except:
             print("Impossible access to the settings file. Error with timestamp get.")
         finally:

@@ -2,7 +2,7 @@
 
 ## Introduction
 <!--A brief description of the purpose and functionality of the project.-->
-The Raw Data Downloader is a Python 3 script that downloads the raw data of a given device registered in the relayr Cloud 2.0 and afterwards it stores it into an InfluxDB instance.
+The Raw Data Downloader is a Python 3 script that downloads the raw data of a given device or group of devices registered in the relayr Cloud 2.0 and afterwards it stores it into an InfluxDB instance.
 
 You can use this script to have always a 1:1 local copy of the raw data from the cloud.
 
@@ -44,9 +44,13 @@ or update if you have already installed it:
 
 
 ### 3) Run the script
-For running the script you have just to browse with your terminal into the folder where you have the script and launch the command, for example:
+For running the script you have just to browse with your terminal into the folder where you have the script and launch the command.
 
-```$ python3 /path_to/raw-data-downloader.py --device myDEVICE_ID --db myDB --org myORG --password myPASS --user myUSER```
+For example for `raw-data-downloader.py`:
+
+```
+$ python3 /path_to/raw-data-downloader.py --device myDEVICE_ID --db myDB --org myORG --password myPASS --user myUSER
+```
 	
 Output example:
 
@@ -67,6 +71,33 @@ Started download thread for the measurement: humidity
 2017-11-13T10:58:51.287Z - temperature - 23
 2017-11-13T10:58:56.556Z - temperature - 23
 ``` 
+
+Or for `groups-data-downloader.py`:
+
+```
+$ python3 /path_to/groups-raw-data-downloader.py --group myGROUP_ID --db myDB --org myORG --password myPASS --user myUSER
+```
+
+Output example:
+
+```
+Connecting to InfluxDB...
+Connection to InfluxDB established
+Acquiring a new refresh token
+Refresh token saved
+Requesting a new access token...
+New access token saved
+Downloading data for device Wemos1 (16b26ba0-961b-4254-bb76-3wsder564321aq)
+Measurements to download:
+temperature
+Started download thread for the measurement: temperature
+Downloading data for device Wemos2 (16b26ba0-961b-4254-bb76-3wsder564321bq)
+Measurements to download:
+humidity
+2017-11-16T12:38:17.280Z - Wemos1 - temperature - 24
+2017-11-16T12:38:22.851Z - Wemos2 - humidity - 43
+```
+
 	
 #### Parameters
 	
@@ -74,6 +105,7 @@ Started download thread for the measurement: humidity
 |:---------:|:------:|:--------:|:-------:|:----------------------------------------------:|
 | --db  	  | string |    yes   |         | --db my_DBname                                 |
 | --device  | string |    yes   |         | --device 1112a222-3333-4455-6666-777f7f7f7fff7 |
+| --group   | string |    yes   |         | --group 1112a222-3333-4455-6666-777f7f7f7fff7  |
 | --user    | string |    yes   |         | --user my_USER                                 |
 | --password | string |  yes    |         | --password my_USERpassword                     |
 | --org     | string |   yes    |         | --org my_ORG                                   |
@@ -83,9 +115,13 @@ Started download thread for the measurement: humidity
 | --special_char | string | no  | None    | --special_char _                               |
 | --refresh | int	|    no     | 10		  | --refresh 10                                   |
 
+**NOTE:** `--device` is available only in `raw-data-downloader.py`, while `--group` is available only in `groups-raw-data-downloader.py`
+
 **db:** the name of the local InfluxDB database where you want to save your readings;
 
 **device:** the deviceID of the device on relayr Cloud 2.0;
+
+**group:** the ID of the device group on relayr Cloud 2.0;
 
 **user:** the user ID in relayr Cloud 2.0;
 
