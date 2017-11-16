@@ -18,7 +18,7 @@ USER = ''
 PASSWORD = ''
 ORG = ''
 START = ''
-DEVICE = ''
+GROUP = ''
 INFLUXDB_ADDRESS = ''
 INFLUXDB_PORT = 0
 DB = ''
@@ -67,59 +67,77 @@ def main():
     tokenclass = TokenClass()
     tokenclass.start()
 
-    # Request the device info.
-    device_req = requests.get('https://cloud.relayr.io/devices/'+DEVICE,
-                              headers={'authorization': 'Bearer '+TOKEN})
-
-    # Parse the JSON received as answer.
-    device_req_json = device_req.json()
-
-    # Save the modelId and and modelVersion.
-    modelId = device_req_json['modelId']
-    modelVersion = str(device_req_json['modelVersion'])
-
-    # Requrst the model info.
-    model_req = requests.get('https://cloud.relayr.io/device-models/'+modelId+'/versions/'+modelVersion,
+    # Request the group info.
+    group_req = requests.get('https://cloud.relayr.io/device-groups/'+GROUP+'/flat',
                              headers={'authorization': 'Bearer '+TOKEN})
 
     # Parse the JSON received as answer.
-    model_req_json = model_req.json()
+    group_req_json = group_req.json()
 
-    measurements_names = []
+    device_list = []
 
-    # Cycle all the measurements.
-    for i in range(len(model_req_json['measurements'])):
-
-        # If there is the special character.
-        if SPECIAL_CHAR is not None:
-
-            # Append to measurements_name only the measurements containing the special char.
-            for char in model_req_json['measurements'][i]['name']:
-                if char == SPECIAL_CHAR:
-                    measurements_names.append(model_req_json['measurements'][i]['name'])
-                pass
-
-        # Otherwise append all the measurements.
-        else:
-            measurements_names.append(model_req_json['measurements'][i]['name'])
-
-    print('Measurements to download:')
-    for i in range(len(measurements_names)):
-        print(measurements_names[i])
+    # Extract the devices IDs from the JSON.
+    for dic in group_req_json['devices']:
+        device_list.append(dic['id'])
 
     raw_class_list = []
 
-    # Start a thread for every different measurement.
-    for i in range(len(measurements_names)):
+    # Loop for every device of the group.
+    for device in device_list:
 
-        # Create a thread passing the influx client and the name of the measurement to download.
-        thread_tmp = RawClass(influxClient, measurements_names[i])
+        # Request the device info.
+        device_req = requests.get('https://cloud.relayr.io/devices/'+device,
+                                  headers={'authorization': 'Bearer '+TOKEN})
 
-        # Append the thread to the measurements thread list.
-        raw_class_list.append(thread_tmp)
+        # Parse the JSON received as answer.
+        device_req_json = device_req.json()
 
-        # Start the thread.
-        thread_tmp.start()
+        # Save the modelId and and modelVersion.
+        modelId = device_req_json['modelId']
+        modelVersion = str(device_req_json['modelVersion'])
+
+        print('Downloading data for device ' + device_req_json['name'] + ' (' + device_req_json['id'] + ')')
+
+        # Requrst the model info.
+        model_req = requests.get('https://cloud.relayr.io/device-models/'+modelId+'/versions/'+modelVersion,
+                                 headers={'authorization': 'Bearer '+TOKEN})
+
+        # Parse the JSON received as answer.
+        model_req_json = model_req.json()
+
+        measurements_names = []
+
+        # Cycle all the measurements.
+        for i in range(len(model_req_json['measurements'])):
+
+            # If there is the special character.
+            if SPECIAL_CHAR is not None:
+
+                # Append to measurements_name only the measurements containing the special char.
+                for char in model_req_json['measurements'][i]['name']:
+                    if char == SPECIAL_CHAR:
+                        measurements_names.append(model_req_json['measurements'][i]['name'])
+                    pass
+
+            # Otherwise append all the measurements.
+            else:
+                measurements_names.append(model_req_json['measurements'][i]['name'])
+
+        print('Measurements to download:')
+        for i in range(len(measurements_names)):
+            print(measurements_names[i])
+
+        # Start a thread for every different measurement.
+        for i in range(len(measurements_names)):
+
+            # Create a thread passing the influx client and the name of the measurement to download.
+            thread_tmp = RawClass(influxClient, device, device_req_json['name'], measurements_names[i])
+
+            # Append the thread to the measurements thread list.
+            raw_class_list.append(thread_tmp)
+
+            # Start the thread.
+            thread_tmp.start()
 
 
 #######################################################################################################################
@@ -178,10 +196,12 @@ class RawClass(threading.Thread):
     """ The class downloads the measurements and saves them in influxdb, then sleeps and start again from the last
         timestamp.
     """
-    def __init__(self, influxClient, measurement_name):
+    def __init__(self, influxClient, device, devname, measurement_name):
         threading.Thread.__init__(self)
         self.name = measurement_name
         self.influxClient = influxClient
+        self.device = device
+        self.devname = devname
 
     def run(self):
 
@@ -200,7 +220,7 @@ class RawClass(threading.Thread):
                 last_timestamp = self.get_last_timestamp()
 
             # Request the raw measurements providing the last timestamp, the device id and measurements name.
-            raw_req = requests.get('https://cloud.relayr.io/devices/' + DEVICE +
+            raw_req = requests.get('https://cloud.relayr.io/devices/' + self.device +
                                    '/raw-measurements?measurements=' + self.name +
                                    '&start=' + last_timestamp,
                                    headers={'authorization': 'Bearer ' + TOKEN})
@@ -226,8 +246,8 @@ class RawClass(threading.Thread):
                     # Update the last timestamp every time the cycle has measurements.
                     last_timestamp = raw_req_json[j]['timestamp']
 
-                    print(raw_req_json[j]['timestamp'] + ' - ' + raw_req_json[j]['name'] + ' - ' + str(
-                        raw_req_json[j]['value']))
+                    print(raw_req_json[j]['timestamp'] + ' - ' + self.devname + ' - ' + raw_req_json[j]['name'] + ' - '
+                          + str(raw_req_json[j]['value']))
 
                 try:
                     # Save data in influxDB.
@@ -296,8 +316,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description="MQTT to InfluxDB")
     parser.add_argument('--db', type=str, required=True,
                         help="Name of InfluxDB database where save the data.")
-    parser.add_argument('--device', type=str, required=True,
-                        help="The deviceID of the device to download the measurements.")
+    parser.add_argument('--group', type=str, required=True,
+                        help="The ID of the group to download the measurements.")
     parser.add_argument('--user', type=str, required=True,
                         help="The user in relayr cloud.")
     parser.add_argument('--password', type=str, required=True,
@@ -325,7 +345,7 @@ if __name__ == '__main__':
     # Assign passed parameters to global variables.
     args = parse_args()
     DB = args.db
-    DEVICE = args.device
+    GROUP = args.group
     USER = args.user
     PASSWORD = args.password
     ORG = args.org
