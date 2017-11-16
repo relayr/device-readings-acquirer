@@ -240,7 +240,8 @@ class RawClass(threading.Thread):
                     data.append({
                         'measurement': raw_req_json[j]['name'],
                         'time': raw_req_json[j]['timestamp'],
-                        'fields': {'value': float(raw_req_json[j]['value'])}
+                        'fields': {'value': float(raw_req_json[j]['value'])},
+                        'tags': {'device': self.devname}
                     })
 
                     # Update the last timestamp every time the cycle has measurements.
